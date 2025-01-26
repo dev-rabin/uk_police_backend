@@ -33,8 +33,6 @@ function decrypt(text) {
 const ComplaintDetailsController = {
     addComplaintDetails: async (req, res) => {
         const { complaint_id, description } = req.body;
-
-        // Encrypt the description before saving it
         const encryptedDescription = encrypt(description);
 
         const query = `
@@ -49,7 +47,8 @@ const ComplaintDetailsController = {
                 .input('complaint_id', complaint_id)
                 .input('description', encryptedDescription)
                 .query(query);
-
+            console.log("result from complaint detail added :  : ", result);
+            
             res.status(200).json({
                 success: true,
                 message: "Complaint description Added Successfully!",

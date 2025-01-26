@@ -1,4 +1,4 @@
-const poolPromise = require("../../db_connection").poolPromise; // Import poolPromise for SQL Server
+const poolPromise = require("../../db_connection").poolPromise;
 
 const ComplaintController = {
   addComplaint: async (req, res) => {
@@ -87,72 +87,83 @@ const ComplaintController = {
 
   searchComplaints: async (req, res) => {
     const { searchTerm } = req.query;
-
+  
     if (!searchTerm) {
       return res.status(400).json({
         success: false,
         message: "Search term is required."
       });
     }
-
+  
     const query = `
       SELECT * FROM complaint
-      WHERE title LIKE @searchTerm OR complaint_id IN (
+      WHERE title LIKE @searchTerm
+      OR complaint_id IN (
         SELECT complaint_id FROM complaint_detail WHERE description LIKE @searchTerm
       )
     `;
-
+  
     try {
       const pool = await poolPromise;
       const result = await pool.request()
         .input('searchTerm', `%${searchTerm}%`)
         .query(query);
-
+  
       res.status(200).json({ success: true, data: result.recordset });
     } catch (err) {
       console.error("Error:", err);
       res.status(500).json({ success: false, message: "Internal Server Error!" });
     }
   },
+  
 
   filterComplaints: async (req, res) => {
-    const { startDate, endDate, filterType, user_id } = req.query;
-
+    const { startDate, endDate, filterType, user_id, filterDate } = req.query;
+  
     let query = "SELECT * FROM complaint WHERE 1=1";
     let values = [];
-
+  
     if (user_id) {
       query += " AND user_id = @user_id";
       values.push({ name: 'user_id', value: user_id });
     }
-
+  
     if (startDate && endDate) {
-      query += " AND created_at BETWEEN @startDate AND @endDate";
-      values.push({ name: 'startDate', value: startDate }, { name: 'endDate', value: endDate });
+      if (startDate === endDate) {
+        query += " AND CAST(created_at AS DATE) = CAST(@startDate AS DATE)";
+        values.push({ name: 'startDate', value: startDate });
+      } else {
+        query += " AND created_at >= @startDate AND created_at <= @endDate";
+        values.push({ name: 'startDate', value: startDate }, { name: 'endDate', value: endDate });
+      }
     }
-
-    if (filterType === 'today') {
+  
+    else if (filterType === 'today') {
       query += " AND CAST(created_at AS DATE) = CAST(GETDATE() AS DATE)";
     }
-
-    if (filterType === 'latest') {
-      query += " ORDER BY created_at DESC";
+  
+    else if (filterType === 'latest') {
+      query += " ORDER BY created_at DESC OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY";
     }
-
+  
+    if (filterDate) {
+      query += " AND CAST(created_at AS DATE) = @filterDate";
+      values.push({ name: 'filterDate', value: filterDate });
+    }
+  
     try {
       const pool = await poolPromise;
       const request = pool.request();
-
-      // Add all parameters to the query request
       values.forEach(val => request.input(val.name, val.value));
-
+  
       const result = await request.query(query);
+      console.log("query : ", query);
       res.status(200).json({ success: true, data: result.recordset });
     } catch (err) {
       console.error("Error:", err);
       res.status(500).json({ success: false, message: "Internal Server Error!" });
     }
-  }
+  },
 };
 
 module.exports = ComplaintController;
