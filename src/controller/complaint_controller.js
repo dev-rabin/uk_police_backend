@@ -169,13 +169,13 @@ const ComplaintController = {
     }
   
     if (startDate && endDate) {
-      if (startDate === endDate) {
-        query += " AND CAST(created_at AS DATE) = CAST(@startDate AS DATE)";
-        values.push({ name: 'startDate', value: startDate });
-      } else {
-        query += " AND created_at >= @startDate AND created_at <= @endDate";
+      // if (startDate === endDate) {
+      //   query += " AND CAST(created_at AS DATE) = CAST(@startDate AS DATE)";
+      //   values.push({ name: 'startDate', value: startDate });
+      // } else {
+        query += " AND created_at >= @startDate AND created_at < DATEADD(day, 1, @endDate)";
         values.push({ name: 'startDate', value: startDate }, { name: 'endDate', value: endDate });
-      }
+      // }
     }
   
     else if (filterType === 'today') {
