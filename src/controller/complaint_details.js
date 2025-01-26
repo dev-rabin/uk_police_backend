@@ -32,33 +32,50 @@ function decrypt(text) {
 
 const ComplaintDetailsController = {
     addComplaintDetails: async (req, res) => {
-        const { complaint_id, description } = req.body;
+        const { complaint_detail_id, description, complaint_id, created_at } = req.body;
         const encryptedDescription = encrypt(description);
-
-        const query = `
-            INSERT INTO complaint_detail (complaint_id, description)
+    
+        const checkQuery = `SELECT complaint_detail_id FROM complaint_detail WHERE complaint_detail_id = @complaint_detail_id`;
+        const insertQuery = `
+            INSERT INTO complaint_detail (complaint_detail_id, description, complaint_id, created_at)
             OUTPUT INSERTED.complaint_detail_id
-            VALUES (@complaint_id, @description)
+            VALUES (@complaint_detail_id, @description, @complaint_id, @created_at)
         `;
-
+    
         try {
             const pool = await poolPromise;
-            const result = await pool.request()
-                .input('complaint_id', complaint_id)
+    
+            // Check if the `complaint_detail_id` already exists in the database
+            const checkResult = await pool.request()
+                .input('complaint_detail_id', complaint_detail_id)
+                .query(checkQuery);
+    
+            if (checkResult.recordset.length > 0) {
+                // If `complaint_detail_id` already exists, skip the insert operation
+                return res.status(200).json({ success: false, message: "Duplicate complaint_detail_id. Entry skipped." });
+            }
+    
+            // If `complaint_detail_id` doesn't exist, proceed with the insert
+            const insertResult = await pool.request()
+                .input('complaint_detail_id', complaint_detail_id)
                 .input('description', encryptedDescription)
-                .query(query);
-            console.log("result from complaint detail added :  : ", result);
-            
+                .input('complaint_id', complaint_id)
+                .input('created_at', created_at)
+                .query(insertQuery);
+    
+            console.log("Result from complaint detail added:", insertResult);
+    
             res.status(200).json({
                 success: true,
                 message: "Complaint description Added Successfully!",
-                data: result.recordset[0].complaint_detail_id,
+                data: insertResult.recordset[0].complaint_detail_id,
             });
         } catch (err) {
             console.error("Error:", err);
             res.status(500).json({ success: false, message: "Internal Server Error!" });
         }
     },
+    
 
     getFullComplaintDetails: async (req, res) => {
         const complaint_id = req.params.complaint_id;

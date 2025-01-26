@@ -1,24 +1,64 @@
 const poolPromise = require("../../db_connection").poolPromise;
 
 const ComplaintController = {
-  addComplaint: async (req, res) => {
-    const { title, user_id } = req.body;
+  // addComplaint: async (req, res) => {
+  //   const {comaplaint_id, title, user_id, created_at } = req.body;
 
-    const query = `INSERT INTO complaint (title, user_id) OUTPUT INSERTED.complaint_id VALUES (@title, @user_id)`;
+  //   const query = `INSERT INTO complaint (comaplaint_id,title, user_id,created_at) OUTPUT INSERTED.complaint_id VALUES (@comaplaint_id,@title, @user_id,@created_at)`;
+
+  //   try {
+  //     const pool = await poolPromise;
+  //     const result = await pool.request()
+  //     .input('comaplaint_id',comaplaint_id)
+  //       .input('title', title)
+  //       .input('user_id', user_id)
+  //       .input('created_at',created_at)
+  //       .query(query);
+      
+  //     res.status(200).json({ success: true, message: "Complaint Added Successfully!", data: result.recordset[0].complaint_id });
+  //   } catch (err) {
+  //     console.error("Error:", err);
+  //     res.status(500).json({ success: false, message: "Internal Server Error!" });
+  //   }
+  // },
+
+  addComplaint: async (req, res) => {
+    const { complaint_id, title, user_id, created_at } = req.body;
+    console.log("req body complaiont : ", req.body);
+    
+    const checkQuery = `SELECT complaint_id FROM complaint WHERE complaint_id = @complaint_id`;
+    const insertQuery = `INSERT INTO complaint (complaint_id, title, user_id, created_at) 
+                         OUTPUT INSERTED.complaint_id 
+                         VALUES (@complaint_id, @title, @user_id, @created_at)`;
 
     try {
-      const pool = await poolPromise;
-      const result = await pool.request()
-        .input('title', title)
-        .input('user_id', user_id)
-        .query(query);
-      
-      res.status(200).json({ success: true, message: "Complaint Added Successfully!", data: result.recordset[0].complaint_id });
+        const pool = await poolPromise;
+
+        // Check if the `complaint_id` already exists in the database
+        const checkResult = await pool.request()
+            .input('complaint_id', complaint_id)
+            .query(checkQuery);
+
+        if (checkResult.recordset.length > 0) {
+            // If `complaint_id` already exists, skip the insert operation
+            return res.status(200).json({ success: false, message: "Duplicate complaint_id. Entry skipped." });
+        }
+
+        // If `complaint_id` doesn't exist, proceed with the insert
+        const insertResult = await pool.request()
+            .input('complaint_id', complaint_id)
+            .input('title', title)
+            .input('user_id', user_id)
+            .input('created_at', created_at)
+            .query(insertQuery);
+
+        res.status(200).json({ success: true, message: "Complaint Added Successfully!", data: insertResult.recordset[0].complaint_id });
     } catch (err) {
-      console.error("Error:", err);
-      res.status(500).json({ success: false, message: "Internal Server Error!" });
+        console.error("Error:", err);
+        res.status(500).json({ success: false, message: "Internal Server Error!" });
     }
-  },
+},
+
 
   getComplaints: async (req, res) => {
     const { user_id } = req.query;
